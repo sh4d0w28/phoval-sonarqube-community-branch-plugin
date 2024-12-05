@@ -54,9 +54,11 @@ import org.sonar.db.protobuf.DbIssues;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -131,6 +133,44 @@ public class AzureDevOpsPullRequestDecorator extends DiscussionAwarePullRequestD
     }
 
     @Override
+    protected List<String> getFileChangesetForPullRequest(AzureDevopsClient client, PullRequest pullRequest) {
+        try {
+            return client.getCommitChanges(pullRequest.getRepository().getProject().getName(), pullRequest.getRepository().getName(), pullRequest.getLastMergeCommit().getCommitId()).stream()
+                    .filter(change -> !change.getChangeItem().isFolder())
+                    .filter(change -> !"delete".equals(change.getChangeType()))
+                    .map(change -> change.getChangeItem().getPath())
+                    .collect(Collectors.toList());
+        } catch (IOException ex) {
+            //throw new IllegalStateException("Could not retrieve filechangeset for Pull Request", ex);
+            logger.error("Could not retrieve filechangeset for Pull Request", ex);
+            return List.of();
+        }
+    }
+
+    @Override
+    protected List<String> getIssueKeysInPrThread(AzureDevopsClient client, PullRequest pullRequest) {
+        try {
+            String allComments = client.retrieveThreads(pullRequest.getRepository().getProject().getName(), pullRequest.getRepository().getName(), pullRequest.getId()).stream()
+                    .map(commentThread -> commentThread.getComments()
+                            .stream().map(Comment::getContent)
+                            .collect(Collectors.joining(" : "))
+                    ).collect(Collectors.joining(" : "));
+
+            Pattern pattern = Pattern.compile("\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b");
+            Matcher matcher = pattern.matcher(allComments);
+            List<String> uuids = new ArrayList<>();
+            while (matcher.find()) {
+                uuids.add(matcher.group());
+            }
+            return uuids;
+        } catch (IOException ex) {
+//            throw new IllegalStateException("Could not retrieve keys list for Pull Request", ex);
+            logger.error("Could not retrieve keys list for Pull Request", ex);
+            return List.of();
+        }
+    }
+
+    @Override
     protected void submitPipelineStatus(AzureDevopsClient client, PullRequest pullRequest, AnalysisDetails analysis, AnalysisSummary analysisSummary) {
         try {
             GitPullRequestStatus gitPullRequestStatus = new GitPullRequestStatus(
@@ -152,6 +192,8 @@ public class AzureDevOpsPullRequestDecorator extends DiscussionAwarePullRequestD
         DbIssues.Locations location = issue.getIssue().getLocations();
 
         try {
+            analysisIssueSummary.setUniqKey(issue.getIssue().key());
+            analysisIssueSummary.setRule(issue.getIssue().getRuleKey().rule());
             CreateCommentRequest comment = new CreateCommentRequest(analysisIssueSummary.format(markdownFormatterFactory));
             CommentPosition fileStart = new CommentPosition(
                     location.getTextRange().getEndLine(),
@@ -175,7 +217,7 @@ public class AzureDevOpsPullRequestDecorator extends DiscussionAwarePullRequestD
     protected void submitSummaryNote(AzureDevopsClient client, PullRequest pullRequest, AnalysisDetails analysis, AnalysisSummary analysisSummary) {
         try {
             CreateCommentRequest comment = new CreateCommentRequest(analysisSummary.format(markdownFormatterFactory));
-            CreateCommentThreadRequest commentThread = new CreateCommentThreadRequest(null, Collections.singletonList(comment), CommentThreadStatus.ACTIVE);
+            CreateCommentThreadRequest commentThread = new CreateCommentThreadRequest(null, Collections.singletonList(comment), CommentThreadStatus.CLOSED);
             CommentThread summaryComment = client.createThread(pullRequest.getRepository().getProject().getName(), pullRequest.getRepository().getName(), pullRequest.getId(), commentThread);
             if (analysis.getQualityGateStatus() == QualityGate.Status.OK) {
                 client.resolvePullRequestThread(pullRequest.getRepository().getProject().getName(), pullRequest.getRepository().getName(), pullRequest.getId(), summaryComment.getId());

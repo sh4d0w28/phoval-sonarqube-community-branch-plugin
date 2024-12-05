@@ -27,6 +27,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.sonar.ce.task.projectanalysis.scm.Changeset;
 import org.sonar.ce.task.projectanalysis.scm.ScmInfoRepository;
 import org.sonar.db.alm.setting.AlmSettingDto;
@@ -46,12 +48,14 @@ import java.util.stream.Collectors;
 
 public abstract class DiscussionAwarePullRequestDecorator<C, P, U, D, N> implements PullRequestBuildStatusDecorator {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DiscussionAwarePullRequestDecorator.class);
+
     private static final String RESOLVED_ISSUE_NEEDING_CLOSED_MESSAGE =
             "This issue no longer exists in SonarQube, but due to other comments being present in this discussion, the discussion is not being being closed automatically. " +
                     "Please manually resolve this discussion once the other comments have been reviewed.";
 
     private static final String VIEW_IN_SONARQUBE_LABEL = "View in SonarQube";
-    private static final Pattern NOTE_MARKDOWN_VIEW_LINK_PATTERN = Pattern.compile("^\\[" + VIEW_IN_SONARQUBE_LABEL + "]\\((.*?)\\)$");
+    private static final Pattern NOTE_MARKDOWN_VIEW_LINK_PATTERN = Pattern.compile("^\\[" + VIEW_IN_SONARQUBE_LABEL + "]\\(([^)]+)(.*?)\\)$");
 
     private final ScmInfoRepository scmInfoRepository;
     private final ReportGenerator reportGenerator;
@@ -78,31 +82,73 @@ public abstract class DiscussionAwarePullRequestDecorator<C, P, U, D, N> impleme
                 .filter(comment -> !projectAlmSettingDto.getMonorepo() || isCommentFromCurrentProject(comment, analysis.getAnalysisProjectKey()))
                 .collect(Collectors.toList());
 
-        List<String> commentKeysForOpenComments = closeOldDiscussionsAndExtractRemainingKeys(client,
-                user,
-                currentProjectSonarqubeComments,
-                openSonarqubeIssues,
-                pullRequest);
+        List<String> changeSetForRequest = getFileChangesetForPullRequest(client, pullRequest);
+        LOGGER.warn("dbg changeSets: " + String.join(" , ", changeSetForRequest));
 
-        List<String> commitIds = getCommitIdsForPullRequest(client, pullRequest);
-        List<Pair<PostAnalysisIssueVisitor.ComponentIssue, String>> uncommentedIssues = findIssuesWithoutComments(openSonarqubeIssues,
-                commentKeysForOpenComments)
+        analysis.setIssues(analysis.getIssues()
                 .stream()
-                .map(DiscussionAwarePullRequestDecorator::loadScmPathsForIssues)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .filter(issue -> isIssueFromCommitInCurrentRequest(issue.getLeft(), commitIds, scmInfoRepository))
-                .collect(Collectors.toList());
-
-        uncommentedIssues.forEach(issue -> submitCommitNoteForIssue(client,
-                pullRequest,
-                issue.getLeft(),
-                issue.getRight(),
-                analysis,
-                reportGenerator.createAnalysisIssueSummary(issue.getLeft(), analysis)));
+                .filter(
+                        issue -> {
+                            boolean passIssue = issue.getScmPath().isPresent() && (
+                                    changeSetForRequest.contains("/"+issue.getScmPath().get()) || changeSetForRequest.contains(issue.getScmPath().get())
+                            );
+                            if (passIssue) {
+                                LOGGER.warn("dbg issue present: " +  issue.getIssue().key() + " : " + (issue.getScmPath().isPresent() ? issue.getScmPath().get() : ""));
+                            }
+                            return passIssue;
+                        }
+                )
+                .collect(Collectors.toList())
+        );
 
         AnalysisSummary analysisSummary = reportGenerator.createAnalysisSummary(analysis);
         submitSummaryNote(client, pullRequest, analysis, analysisSummary);
+
+        try {
+            List<String> commentKeysForOpenComments = closeOldDiscussionsAndExtractRemainingKeys(client,
+                    user,
+                    currentProjectSonarqubeComments,
+                    openSonarqubeIssues,
+                    pullRequest);
+
+            List<String> keysInComments = getIssueKeysInPrThread(client, pullRequest);
+            LOGGER.warn("dbg keyincommn: " + String.join(" , ", keysInComments));
+
+            List<Pair<PostAnalysisIssueVisitor.ComponentIssue, String>> uncommentedIssues = findIssuesWithoutComments(openSonarqubeIssues,
+                    commentKeysForOpenComments)
+                    .stream()
+                    .map(DiscussionAwarePullRequestDecorator::loadScmPathsForIssues)
+                    .filter(Optional::isPresent)
+                    .map(Optional::get)
+                    .filter(issue -> !keysInComments.contains(issue.getLeft().getIssue().key()))
+                    .filter(issue -> changeSetForRequest.contains(issue.getRight()) || changeSetForRequest.contains("/" + issue.getRight()))
+                    //.filter(issue -> isIssueFromCommitInCurrentRequest(issue.getLeft(), commitIds, scmInfoRepository))
+                    .collect(Collectors.toList());
+
+            if (analysisSummary.getTotalIssueCount() < 50 && keysInComments.size() < 10) {
+                uncommentedIssues.stream()
+                        // only blockers and criticals
+                        .filter(issue -> {
+                            if("MAJOR CRITICAL BLOCKER".contains(issue.getLeft().getIssue().severity().toUpperCase())) {
+                                return true;
+                            }
+                            LOGGER.warn("dbg limit by severity " + issue.getLeft().getIssue().key() + " : " + issue.getLeft().getIssue().severity().toUpperCase());
+                            return false;
+                        })
+                        .limit(10)
+                        .forEach(issue -> submitCommitNoteForIssue(client,
+                                pullRequest,
+                                issue.getLeft(),
+                                issue.getRight(),
+                                analysis,
+                                reportGenerator.createAnalysisIssueSummary(issue.getLeft(), analysis)));
+            } else {
+                LOGGER.warn("dbg limit skip by count TotalIssueCount=" + analysisSummary.getTotalIssueCount() + "keysInComments:" + keysInComments.size());
+            }
+        } catch (Exception e) {
+            LOGGER.error("Issue when posting comments", e);
+        }
+
         submitPipelineStatus(client, pullRequest, analysis, analysisSummary);
 
         DecorationResult.Builder builder = DecorationResult.builder();
@@ -119,6 +165,10 @@ public abstract class DiscussionAwarePullRequestDecorator<C, P, U, D, N> impleme
     protected abstract U getCurrentUser(C client);
 
     protected abstract List<String> getCommitIdsForPullRequest(C client, P pullRequest);
+
+    protected abstract List<String> getFileChangesetForPullRequest(C client, P pullRequest);
+
+    protected abstract List<String> getIssueKeysInPrThread(C client, P pullRequest);
 
     protected abstract void submitPipelineStatus(C client, P pullRequest, AnalysisDetails analysis, AnalysisSummary analysisSummary);
 

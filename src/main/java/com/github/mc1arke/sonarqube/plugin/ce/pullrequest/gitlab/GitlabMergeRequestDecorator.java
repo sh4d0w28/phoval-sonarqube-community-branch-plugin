@@ -116,6 +116,16 @@ public class GitlabMergeRequestDecorator extends DiscussionAwarePullRequestDecor
     }
 
     @Override
+    protected List<String> getFileChangesetForPullRequest(GitlabClient client, MergeRequest pullRequest) {
+        return List.of();
+    }
+
+    @Override
+    protected List<String> getIssueKeysInPrThread(GitlabClient client, MergeRequest pullRequest) {
+        return List.of();
+    }
+
+    @Override
     protected void submitPipelineStatus(GitlabClient gitlabClient, MergeRequest mergeRequest, AnalysisDetails analysis,
                                         AnalysisSummary analysisSummary) {
         Long pipelineId = analysis.getScannerProperty(PULLREQUEST_GITLAB_PIPELINE_ID)

@@ -18,13 +18,7 @@
  */
 package com.github.mc1arke.sonarqube.plugin.ce.pullrequest.report;
 
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Document;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Formatter;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.FormatterFactory;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Image;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Link;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Paragraph;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Text;
+import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.*;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -62,24 +56,21 @@ class AnalysisIssueSummaryTest {
         verify(documentFormatter).format(documentArgumentCaptor.capture());
 
         assertThat(documentArgumentCaptor.getValue())
-                .usingRecursiveComparison()
-                .isEqualTo(
-                    new Document(
-                            new Paragraph(
-                                    new Text("**Type:** type "),
-                                    new Image("type", "typeImageUrl")
-                            ),
-                            new Paragraph(
-                                    new Text("**Severity:** severity "),
-                                    new Image("severity", "severityImageUrl")
-                            ),
-                            new Paragraph(new Text("**Message:** message")),
-                            new Paragraph(new Text("**Duration (min):** 101")),
-                            new Paragraph(new Text("**Resolution:** resolution")),
-                            new Paragraph(new Text("**Project ID:** projectKey **Issue ID:** issueKey")),
-                            new Paragraph(new Link("issueUrl", new Text("View in SonarQube")))
-                )
-        );
+            .usingRecursiveComparison()
+            .isEqualTo(
+                new Document(
+                        new Paragraph(
+                                new Text("  message")
+                        ),
+                        new Paragraph(
+                                new Link("issueUrl", new Text("View in SonarQube")),
+                                new Text("      "),
+                                new Link("https://link.orangelogic.com/Tasks/262A92", new Text("Report false positive"))
+                        ),
+                        new Heading(6, new Text("")),
+                        new Paragraph(new Text(""))
+                    )
+            );
     }
 
 }

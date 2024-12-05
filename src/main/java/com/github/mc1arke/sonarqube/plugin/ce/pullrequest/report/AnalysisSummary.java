@@ -199,49 +199,20 @@ public final class AnalysisSummary {
     }
 
     public String format(FormatterFactory formatterFactory) {
-        NumberFormat decimalFormat = new DecimalFormat("#0.00", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
-
-        List<String> failedConditions = getFailedQualityGateConditions();
-
-        Document document = new Document(new Paragraph(new Image(getStatusDescription(), getStatusImageUrl())),
-                failedConditions.isEmpty() ? new Text("") :
-                        new com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List(
-                                com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List.Style.BULLET,
-                                failedConditions.stream()
-                                        .map(Text::new)
-                                        .map(ListItem::new)
-                                        .toArray(ListItem[]::new)),
-                new Heading(1, new Text("Analysis Details")),
-                new Heading(2, new Text(pluralOf(getTotalIssueCount(), "Issue", "Issues"))),
-                new com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List(
-                        com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List.Style.BULLET,
-                        new ListItem(new Link(getBugUrl(), new Image("Bug", getBugImageUrl())),
-                                new Text(" "),
-                                new Text(pluralOf(getBugCount(), "Bug", "Bugs"))),
-                        new ListItem(new Link(getVulnerabilityUrl(), new Image("Vulnerability", getVulnerabilityImageUrl())),
-                                new Text(" "),
-                                new Text(pluralOf(getVulnerabilityCount() + getSecurityHotspotCount(), "Vulnerability", "Vulnerabilities"))),
-                        new ListItem(new Link(getCodeSmellUrl(), new Image("Code Smell", getCodeSmellImageUrl())),
-                                new Text(" "),
-                                new Text(pluralOf(getCodeSmellCount(), "Code Smell", "Code Smells")))),
-                new Heading(2, new Text("Coverage and Duplications")),
-                new com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List(
-                        com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List.Style.BULLET,
-                        new ListItem(new Link(getCoverageUrl(), new Image("Coverage", getCoverageImageUrl())),
-                                new Text(" "), new Text(
-                                Optional.ofNullable(getNewCoverage())
-                                        .map(decimalFormat::format)
-                                        .map(i -> i + "% Coverage")
-                                        .orElse("No coverage information") + " (" +
-                                        decimalFormat.format(Optional.ofNullable(getCoverage()).orElse(BigDecimal.valueOf(0))) + "% Estimated after merge)")),
-                        new ListItem(new Link(getDuplicationsUrl(), new Image("Duplications", getDuplicationsImageUrl())),
-                                new Text(" "),
-                                new Text(Optional.ofNullable(getNewDuplications())
-                                        .map(decimalFormat::format)
-                                        .map(i -> i + "% Duplicated Code")
-                                        .orElse("No duplication information") + " (" + decimalFormat.format(Optional.ofNullable(getDuplications()).orElse(BigDecimal.ZERO)) + "% Estimated after merge)"))),
-                new Paragraph(new Text(String.format("**Project ID:** %s", getProjectKey()))),
-                new Paragraph(new Link(getDashboardUrl(), new Text("View in SonarQube"))));
+        if (getTotalIssueCount() == 0) {
+            Document document = new Document(new Paragraph(new Text("Analysis Details: 0 Issues")));
+            return formatterFactory.documentFormatter().format(document);
+        }
+        Document document = new Document(
+                new Paragraph(
+                        new Text("Analysis Details: "),
+                        new Link(getDashboardUrl(), new Text(pluralOf(getTotalIssueCount(), "Issue", "Issues"))),
+                        new Text("      "),
+                        new Text(getBugCount() > 0 ? pluralOf(getBugCount(), " bug, ", " bugs, ") : ""),
+                        new Text(getVulnerabilityCount() + getSecurityHotspotCount() > 0 ? pluralOf(getVulnerabilityCount() + getSecurityHotspotCount(), " vulnerability, ", " vulnerabilities, "): ""),
+                        new Text(getCodeSmellCount() > 0 ? pluralOf(getCodeSmellCount(), " code smell", " code smells"): "")
+                ),new Heading(6, new Text("*sonarqube may show more due to slow master sync"))
+        );
 
         return formatterFactory.documentFormatter().format(document);
     }

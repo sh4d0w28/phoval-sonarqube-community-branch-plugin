@@ -18,17 +18,13 @@
  */
 package com.github.mc1arke.sonarqube.plugin.ce.pullrequest.report;
 
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Document;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.FormatterFactory;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Image;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Link;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Node;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Paragraph;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Text;
+import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.*;
 import org.apache.commons.lang.StringUtils;
 
 public final class AnalysisIssueSummary {
 
+    private String uniqKey;
+    private String rule;
     private final String typeImageUrl;
     private final String severityImageUrl;
     private final String issueUrl;
@@ -52,6 +48,12 @@ public final class AnalysisIssueSummary {
         this.severity = builder.severity;
         this.resolution = builder.resolution;
     }
+
+    public void setRule(String rule) { this.rule = rule; }
+
+    public void setUniqKey(String key) { this.uniqKey = key; }
+
+    public String getUniqKey() { return this.uniqKey; }
 
     public String getTypeImageUrl() {
         return typeImageUrl;
@@ -93,20 +95,51 @@ public final class AnalysisIssueSummary {
         return resolution;
     }
 
+    private String getEmojiType(String type) {
+        switch (type) {
+            case "CODE_SMELL":
+                return "🦨";
+            case "BUG":
+                return "🪳";
+            case "VULNERABILITY":
+                return "🔓";
+            case "SECURITY_HOTSPOT":
+                return "🔥";
+            default:
+                return  "";
+        }
+    }
+
+    private String getEmojiSeverity(String severity) {
+        switch(severity) {
+            case "INFO": return "⚠";
+            case "MINOR": return "⚠️";
+            case "MAJOR": return "🟡";
+            case "CRITICAL": return "🔴";
+            case "BLOCKER": return "⛔";
+            default: return "";
+        }
+    }
+
     public String format(FormatterFactory formatterFactory) {
         Long effort = getEffortInMinutes();
         Node effortNode = (null == effort ? new Text("") : new Paragraph(new Text(String.format("**Duration (min):** %s", effort))));
 
         Node resolutionNode = (StringUtils.isBlank(getResolution()) ? new Text("") : new Paragraph(new Text(String.format("**Resolution:** %s", getResolution()))));
+        String type = getEmojiType(getType());
+        String severity = getEmojiSeverity(getSeverity());
 
         Document document = new Document(
-                new Paragraph(new Text(String.format("**Type:** %s ", getType())), new Image(getType(), getTypeImageUrl())),
-                new Paragraph(new Text(String.format("**Severity:** %s ", getSeverity())), new Image(getSeverity(), getSeverityImageUrl())),
-                new Paragraph(new Text(String.format("**Message:** %s", getMessage()))),
-                effortNode,
-                resolutionNode,
-                new Paragraph(new Text(String.format("**Project ID:** %s **Issue ID:** %s", getProjectKey(), getIssueKey()))),
-                new Paragraph(new Link(getIssueUrl(), new Text("View in SonarQube")))
+            new Paragraph(
+                    new Text(String.format("%s %s %s", type, severity, getMessage()))
+            ),
+            new Paragraph(
+                    new Link(getIssueUrl(), new Text("View in SonarQube")),
+                    new Text("      "),
+                    new Link("https://link.orangelogic.com/Tasks/262A92", new Text("Report false positive"))
+            ),
+            new Heading(6, new Text(rule == null ? "" : "to ignore comment: surround bad code line with:")),
+            new Paragraph(new Text(rule == null ? "" : ("```\n#pragma warning disable "+ rule +"\nLINE WITH BAD CODE HERE \n#pragma warning restore "+ rule + "\n```")))
         );
 
         return formatterFactory.documentFormatter().format(document);

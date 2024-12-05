@@ -21,28 +21,22 @@ package com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class PullRequest {
-
-    private final int id;
-    private final Repository repository;
-    private final Commit lastMergeCommit;
+public class ChangeItem {
+    private final String path;
+    private final Boolean isFolder;
 
     @JsonCreator
-    public PullRequest(@JsonProperty("pullRequestId") int id, @JsonProperty("repository") Repository repository, @JsonProperty("lastMergeCommit") Commit lastMergeCommit) {
-        this.id = id;
-        this.repository = repository;
-        this.lastMergeCommit = lastMergeCommit;
+    public ChangeItem(@JsonProperty("path") String path, @JsonProperty("isFolder") Boolean isFolder)
+    {
+        this.path = path;
+        this.isFolder = isFolder != null && isFolder;
     }
 
-    public int getId() {
-        return id;
+    public boolean isFolder() {
+        return isFolder;
     }
 
-    public Repository getRepository() {
-        return repository;
-    }
-
-    public Commit getLastMergeCommit() {
-        return lastMergeCommit;
+    public String getPath() {
+        return path;
     }
 }

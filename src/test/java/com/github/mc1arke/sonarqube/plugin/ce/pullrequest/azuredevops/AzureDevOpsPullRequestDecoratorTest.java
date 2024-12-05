@@ -393,7 +393,7 @@ public class AzureDevOpsPullRequestDecoratorTest {
                 .withHeader("Accept", equalTo("application/json"))
                 .withHeader("Content-Type", equalTo("application/json; charset=UTF-8"))
                 .withHeader("Authorization", equalTo(authHeader))
-                .withRequestBody(equalTo("{\"comments\":[{\"content\":\"analysis summary\"}],\"status\":\"active\"}"))
+                .withRequestBody(equalTo("{\"comments\":[{\"content\":\"analysis summary\"}],\"status\":\"closed\"}"))
                 .willReturn(aResponse().withStatus(200).withBody("{" + System.lineSeparator() +
                         "  \"pullRequestThreadContext\": {" + System.lineSeparator() +
                         "    \"iterationContext\": {" + System.lineSeparator() +
@@ -511,6 +511,46 @@ public class AzureDevOpsPullRequestDecoratorTest {
                         "}")
                 )
                 .willReturn(ok()));
+
+
+        wireMockRule.stubFor(get(urlEqualTo("/azure%20Project/_apis/git/repositories/my%20Repository/commits/39f52d24533cc712fc845ed9fd1b6c06b3942588/changes?api-version=4.1"))
+                .withHeader("Content-Type", equalTo("application/json; charset=UTF-8"))
+                .withHeader("Authorization", equalTo(authHeader))
+                .willReturn(aResponse().withStatus(200).withBody("{" + System.lineSeparator() +
+                        "  \"changeCounts\": {" + System.lineSeparator() +
+                        "    \"Edit\": 4" + System.lineSeparator() +
+                        "  }," + System.lineSeparator() +
+                        "  \"changes\": [" + System.lineSeparator() +
+                        "    {" + System.lineSeparator() +
+                        "      \"item\": {" + System.lineSeparator() +
+                        "        \"path\": \"/XCortex\"," + System.lineSeparator() +
+                        "        \"isFolder\": true" + System.lineSeparator() +
+                        "      }," + System.lineSeparator() +
+                        "      \"changeType\": \"edit\"" + System.lineSeparator() +
+                        "    }," + System.lineSeparator() +
+                        "    {" + System.lineSeparator() +
+                        "      \"item\": {" + System.lineSeparator() +
+                        "        \"path\": \"/XCortex/Oes\"," + System.lineSeparator() +
+                        "        \"isFolder\": true" + System.lineSeparator() +
+                        "      }," + System.lineSeparator() +
+                        "      \"changeType\": \"edit\"" + System.lineSeparator() +
+                        "    }," + System.lineSeparator() +
+                        "    {" + System.lineSeparator() +
+                        "      \"item\": {" + System.lineSeparator() +
+                        "        \"path\": \"/XCortex/Oes/Web\"," + System.lineSeparator() +
+                        "        \"isFolder\": true" + System.lineSeparator() +
+                        "      }," + System.lineSeparator() +
+                        "      \"changeType\": \"edit\"" + System.lineSeparator() +
+                        "    }," + System.lineSeparator() +
+                        "    {" + System.lineSeparator() +
+                        "      \"item\": {" + System.lineSeparator() +
+                        "        \"path\": \"/XCortex/Oes/Web/ApplicationBeginRequestService.cs\"" + System.lineSeparator() +
+                        "      }," + System.lineSeparator() +
+                        "      \"changeType\": \"edit\"" +  System.lineSeparator() +
+                        "    }" + System.lineSeparator() +
+                        "  ]" + System.lineSeparator() +
+                        "}")
+                ));
     }
 
     @Test

@@ -39,7 +39,7 @@ public class AnalysisDetails {
 
     private final String pullRequestId;
     private final String commitId;
-    private final List<PostAnalysisIssueVisitor.ComponentIssue> issues;
+    private List<PostAnalysisIssueVisitor.ComponentIssue> issues;
     private final QualityGate qualityGate;
     private final PostProjectAnalysisTask.ProjectAnalysis projectAnalysis;
 
@@ -93,6 +93,10 @@ public class AnalysisDetails {
 
     public List<PostAnalysisIssueVisitor.ComponentIssue> getIssues() {
         return issues;
+    }
+
+    public void setIssues(List<PostAnalysisIssueVisitor.ComponentIssue> issues) {
+        this.issues = issues;
     }
 
     public List<PostAnalysisIssueVisitor.ComponentIssue> getScmReportableIssues() {

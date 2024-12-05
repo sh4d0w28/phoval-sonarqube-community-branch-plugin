@@ -28,6 +28,8 @@ import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.CreateCom
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.GitPullRequestStatus;
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.PullRequest;
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.Repository;
+import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.Change;
+import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.Changes;
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.UpdateCommentThreadStatusRequest;
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.enums.CommentThreadStatus;
 import org.apache.http.HttpResponse;
@@ -116,6 +118,11 @@ public class AzureDevopsRestClient implements AzureDevopsClient {
         return Objects.requireNonNull(execute(url, "get", null, Commits.class)).getValue();
     }
 
+    @Override
+    public List<Change> getCommitChanges(String projectId, String repositoryName, String commitId) throws IOException {
+        String url = String.format("%s/%s/_apis/git/repositories/%s/commits/%s/changes?api-version=%s", apiUrl, encode(projectId), encode(repositoryName), commitId, API_VERSION);
+        return Objects.requireNonNull(execute(url, "get", null, Changes.class)).getChanges();
+    }
 
     private <T> T execute(String url, String method, String content, Class<T> type) throws IOException {
         RequestBuilder requestBuilder = RequestBuilder.create(method)

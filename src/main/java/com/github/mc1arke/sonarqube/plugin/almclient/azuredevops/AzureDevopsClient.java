@@ -25,6 +25,7 @@ import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.CreateCom
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.GitPullRequestStatus;
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.PullRequest;
 import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.Repository;
+import com.github.mc1arke.sonarqube.plugin.almclient.azuredevops.model.Change;
 
 import java.io.IOException;
 import java.util.List;
@@ -46,4 +47,6 @@ public interface AzureDevopsClient {
     void submitPullRequestStatus(String projectName, String repositoryName, int pullRequestId, GitPullRequestStatus status) throws IOException;
 
     Repository getRepository(String projectName, String repositoryName) throws IOException;
+
+    List<Change> getCommitChanges(String projectId, String repositoryName, String commitId) throws IOException;
 }

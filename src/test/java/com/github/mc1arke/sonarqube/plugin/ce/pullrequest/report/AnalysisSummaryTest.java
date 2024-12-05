@@ -18,16 +18,7 @@
  */
 package com.github.mc1arke.sonarqube.plugin.ce.pullrequest.report;
 
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Document;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Formatter;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.FormatterFactory;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Heading;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Image;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Link;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.List;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.ListItem;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Paragraph;
-import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.Text;
+import com.github.mc1arke.sonarqube.plugin.ce.pullrequest.markup.*;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -81,43 +72,19 @@ class AnalysisSummaryTest {
         ArgumentCaptor<Document> documentArgumentCaptor = ArgumentCaptor.forClass(Document.class);
         verify(formatter).format(documentArgumentCaptor.capture());
 
-        Document expectedDocument = new Document(new Paragraph(new Image("status description", "statusImageUrl")),
-                new List(List.Style.BULLET,
-                        new ListItem(new Text("issuea")),
-                        new ListItem(new Text("issueb")),
-                        new ListItem(new Text("issuec"))),
-                new Heading(1, new Text("Analysis Details")),
-                new Heading(2, new Text("666 Issues")),
-                new List(List.Style.BULLET,
-                    new ListItem(
-                        new Link("bugUrl", new Image("Bug","bugImageUrl")),
-                        new Text(" "),
-                        new Text("911 Bugs")),
-                new ListItem(
-                        new Link("vulnerabilityUrl", new Image("Vulnerability","vulnerabilityImageUrl")),
-                        new Text(" "),
-                        new Text("165 Vulnerabilities")),
-                new ListItem(
-                        new Link("codeSmellUrl", new Image("Code Smell", "codeSmellImageUrl")),
-                        new Text(" "),
-                        new Text("1 Code Smell"))),
-                new Heading(2, new Text("Coverage and Duplications")),
-                new List(List.Style.BULLET,
-                        new ListItem(
-                            new Link("codeCoverageUrl", new Image("Coverage", "codeCoverageImageUrl")),
-                            new Text(" "),
-                            new Text("99.00% Coverage (303.00% Estimated after merge)")),
-                        new ListItem(
-                                new Link("duplicationsUrl", new Image("Duplications", "duplicationsImageUrl")),
-                                new Text(" "),
-                                new Text("199.00% Duplicated Code (66.00% Estimated after merge)"))),
-                new Paragraph(new Text("**Project ID:** projectKey")),
-                new Paragraph(new Link("dashboardUrl", new Text("View in SonarQube"))));
+        Document expectedDocument = new Document(
+            new Paragraph(
+                new Text("Analysis Details: "),
+                new Link("dashboardUrl", new Text("666 Issues")),
+                new Text("      "),
+                new Text("911  bugs, "),
+                new Text("165  vulnerabilities, "),
+                new Text("1  code smell")
+            ),new Heading(6, new Text("*sonarqube may show more due to slow master sync"))
+        );
 
         assertThat(documentArgumentCaptor.getValue()).usingRecursiveComparison().isEqualTo(expectedDocument);
-
     }
-
 
     @Test
     void shouldReturn0ForTotalDuplicationsWhereValueIsNull() {
@@ -159,38 +126,18 @@ class AnalysisSummaryTest {
         ArgumentCaptor<Document> documentArgumentCaptor = ArgumentCaptor.forClass(Document.class);
         verify(formatter).format(documentArgumentCaptor.capture());
 
-        Document expectedDocument = new Document(new Paragraph(new Image("status description", "statusImageUrl")),
-            new List(List.Style.BULLET,
-                new ListItem(new Text("issuea")),
-                new ListItem(new Text("issueb")),
-                new ListItem(new Text("issuec"))),
-            new Heading(1, new Text("Analysis Details")),
-            new Heading(2, new Text("666 Issues")),
-            new List(List.Style.BULLET,
-                new ListItem(
-                    new Link("bugUrl", new Image("Bug","bugImageUrl")),
-                    new Text(" "),
-                    new Text("911 Bugs")),
-                new ListItem(
-                    new Link("vulnerabilityUrl", new Image("Vulnerability","vulnerabilityImageUrl")),
-                    new Text(" "),
-                    new Text("165 Vulnerabilities")),
-                new ListItem(
-                    new Link("codeSmellUrl", new Image("Code Smell", "codeSmellImageUrl")),
-                    new Text(" "),
-                    new Text("1 Code Smell"))),
-            new Heading(2, new Text("Coverage and Duplications")),
-            new List(List.Style.BULLET,
-                new ListItem(
-                    new Link("codeCoverageUrl", new Image("Coverage", "codeCoverageImageUrl")),
-                    new Text(" "),
-                    new Text("99.00% Coverage (303.00% Estimated after merge)")),
-                new ListItem(
-                    new Link("duplicationsUrl", new Image("Duplications", "duplicationsImageUrl")),
-                    new Text(" "),
-                    new Text("199.00% Duplicated Code (0.00% Estimated after merge)"))),
-            new Paragraph(new Text("**Project ID:** projectKey")),
-            new Paragraph(new Link("dashboardUrl", new Text("View in SonarQube"))));
+        System.out.println(underTest.format(new MarkdownFormatterFactory()));
+
+        Document expectedDocument = new Document(
+            new Paragraph(
+                new Text("Analysis Details: "),
+                new Link("dashboardUrl", new Text("666 Issues")),
+                new Text("      "),
+                new Text("911  bugs, "),
+                new Text("165  vulnerabilities, "),
+                new Text("1  code smell")
+            ),new Heading(6, new Text("*sonarqube may show more due to slow master sync"))
+        );
 
         assertThat(documentArgumentCaptor.getValue()).usingRecursiveComparison().isEqualTo(expectedDocument);
 
