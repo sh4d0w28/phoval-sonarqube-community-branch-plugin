@@ -33,25 +33,16 @@ import org.sonar.api.measures.CoreMetrics;
 import org.sonar.api.server.ws.Request;
 import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
-import org.sonar.api.utils.DateUtils;
 import org.sonar.api.web.UserRole;
 import org.sonar.db.DbClient;
 import org.sonar.db.DbSession;
-import org.sonar.db.component.BranchDao;
-import org.sonar.db.component.BranchDto;
-import org.sonar.db.component.BranchType;
-import org.sonar.db.component.SnapshotDto;
-import org.sonar.db.measure.LiveMeasureDto;
 import org.sonar.db.permission.GlobalPermission;
 import org.sonar.db.project.ProjectDto;
-import org.sonar.db.protobuf.DbProjectBranches;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.user.UserSession;
 import org.sonar.server.ws.WsUtils;
 import org.sonarqube.ws.ProjectPullRequests;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import com.google.common.base.Strings;
 
 public class ListAction extends ProjectWsAction {
 
@@ -77,30 +68,7 @@ public class ListAction extends ProjectWsAction {
     @Override
     public void handleProjectRequest(ProjectDto project, Request request, Response response, DbSession dbSession) {
          checkPermission(project, userSession);
-
-        BranchDao branchDao = getDbClient().branchDao();
-        List<BranchDto> pullRequests = branchDao.selectByProject(dbSession, project).stream()
-            .filter(b -> b.getBranchType() == BranchType.PULL_REQUEST)
-            .collect(Collectors.toList());
-        List<String> pullRequestUuids = pullRequests.stream().map(BranchDto::getUuid).collect(Collectors.toList());
-
-        Map<String, BranchDto> mergeBranchesByUuid = branchDao
-            .selectByUuids(dbSession, pullRequests.stream()
-                .map(BranchDto::getMergeBranchUuid)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList()))
-            .stream().collect(Collectors.toMap(BranchDto::getUuid, Function.identity()));
-
-        Map<String, LiveMeasureDto> qualityGateMeasuresByComponentUuids = getDbClient().liveMeasureDao()
-            .selectByComponentUuidsAndMetricKeys(dbSession, pullRequestUuids, List.of(CoreMetrics.ALERT_STATUS_KEY)).stream()
-            .collect(Collectors.toMap(LiveMeasureDto::getComponentUuid, Function.identity()));
-        Map<String, String> analysisDateByBranchUuid = getDbClient().snapshotDao().selectLastAnalysesByRootComponentUuids(dbSession, pullRequestUuids).stream()
-            .collect(Collectors.toMap(SnapshotDto::getRootComponentUuid, s -> DateUtils.formatDateTime(s.getCreatedAt())));
-
         ProjectPullRequests.ListWsResponse.Builder protobufResponse = ProjectPullRequests.ListWsResponse.newBuilder();
-        pullRequests
-            .forEach(b -> addPullRequest(protobufResponse, b, mergeBranchesByUuid, qualityGateMeasuresByComponentUuids.get(b.getUuid()),
-                analysisDateByBranchUuid.get(b.getUuid())));
         protoBufWriter.write(protobufResponse.build(), request, response);
     }
 
@@ -111,47 +79,5 @@ public class ListAction extends ProjectWsAction {
             return;
         }
         throw insufficientPrivilegesException();
-    }
-
-    private static void addPullRequest(ProjectPullRequests.ListWsResponse.Builder response, BranchDto branch, Map<String, BranchDto> mergeBranchesByUuid,
-                                       @Nullable LiveMeasureDto qualityGateMeasure, @Nullable String analysisDate) {
-        Optional<BranchDto> mergeBranch = Optional.ofNullable(mergeBranchesByUuid.get(branch.getMergeBranchUuid()));
-
-        ProjectPullRequests.PullRequest.Builder builder = ProjectPullRequests.PullRequest.newBuilder();
-        builder.setKey(branch.getKey());
-
-        Optional<DbProjectBranches.PullRequestData> optionalPullRequestData = Optional.ofNullable(branch.getPullRequestData());
-        optionalPullRequestData.ifPresent(pullRequestData -> {
-            builder.setBranch(pullRequestData.getBranch());
-            Optional.ofNullable(Strings.emptyToNull(pullRequestData.getUrl())).ifPresent(builder::setUrl);
-            Optional.ofNullable(Strings.emptyToNull(pullRequestData.getTitle())).ifPresent(builder::setTitle);
-        });
-
-        if (mergeBranch.isPresent()) {
-            String mergeBranchKey = mergeBranch.get().getKey();
-            builder.setBase(mergeBranchKey);
-        } else {
-            builder.setIsOrphan(true);
-        }
-
-        Optional<String> pullRequestTarget = optionalPullRequestData.map(DbProjectBranches.PullRequestData::getTarget)
-                .filter(StringUtils::isNotEmpty);
-        if (pullRequestTarget.isPresent()) {
-            builder.setTarget(pullRequestTarget.get());
-        } else {
-            mergeBranch.ifPresent(branchDto -> builder.setTarget(branchDto.getKey()));
-        }
-
-        Optional.ofNullable(analysisDate).ifPresent(builder::setAnalysisDate);
-        setQualityGate(builder, qualityGateMeasure);
-        response.addPullRequests(builder);
-    }
-
-    private static void setQualityGate(ProjectPullRequests.PullRequest.Builder builder, @Nullable LiveMeasureDto qualityGateMeasure) {
-        ProjectPullRequests.Status.Builder statusBuilder = ProjectPullRequests.Status.newBuilder();
-        if (qualityGateMeasure != null) {
-            Optional.ofNullable(qualityGateMeasure.getDataAsString()).ifPresent(statusBuilder::setQualityGateStatus);
-        }
-        builder.setStatus(statusBuilder);
     }
 }

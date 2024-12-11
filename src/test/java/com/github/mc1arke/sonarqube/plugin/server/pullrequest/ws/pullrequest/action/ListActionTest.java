@@ -29,24 +29,13 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.sonar.api.server.ws.Request;
 import org.sonar.api.server.ws.Response;
 import org.sonar.api.server.ws.WebService;
 import org.sonar.db.DbClient;
-import org.sonar.db.component.BranchDao;
-import org.sonar.db.component.BranchDto;
-import org.sonar.db.component.BranchType;
-import org.sonar.db.component.SnapshotDao;
-import org.sonar.db.component.SnapshotDto;
-import org.sonar.db.measure.LiveMeasureDao;
-import org.sonar.db.measure.LiveMeasureDto;
-import org.sonar.db.project.ProjectDto;
-import org.sonar.db.protobuf.DbProjectBranches;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.exceptions.ForbiddenException;
 import org.sonar.server.user.UserSession;
-import org.sonarqube.ws.ProjectPullRequests;
 
 class ListActionTest {
 
@@ -75,118 +64,6 @@ class ListActionTest {
         verifyNoMoreInteractions(projectParam);
 
         verifyNoMoreInteractions(newController);
-    }
-
-    @Test
-    void shouldExecuteRequestWithValidParameter() {
-        Request request = mock(Request.class);
-        when(request.mandatoryParam("project")).thenReturn("project");
-
-        when(componentFinder.getProjectByKey(any(), any())).thenReturn(new ProjectDto().setKey("projectKey").setUuid("uuid0"));
-
-        when(userSession.hasPermission(any())).thenReturn(true);
-
-        BranchDao branchDao = mock(BranchDao.class);
-        when(dbClient.branchDao()).thenReturn(branchDao);
-        when(branchDao.selectByProject(any(), any())).thenReturn(List.of(new BranchDto()
-            .setBranchType(BranchType.PULL_REQUEST)
-            .setKey("prKey")
-            .setUuid("uuid1")
-            .setMergeBranchUuid("uuid2")
-            .setPullRequestData(DbProjectBranches.PullRequestData.newBuilder()
-                .setBranch("prBranch")
-                .setTitle("title")
-                .setTarget("target")
-                .setUrl("url")
-                .build()),
-            new BranchDto()
-                .setBranchType(BranchType.PULL_REQUEST)
-                .setKey("prKey2")
-                .setUuid("uuid3")
-                .setMergeBranchUuid("orphan")
-                .setPullRequestData(DbProjectBranches.PullRequestData.newBuilder()
-                    .setBranch("prBranch2")
-                    .setTitle("title2")
-                    .setUrl("url2")
-                    .build()),
-            new BranchDto()
-                .setBranchType(BranchType.PULL_REQUEST)
-                .setKey("prKey3")
-                .setUuid("uuid4")
-                .setMergeBranchUuid("uuid2")
-                .setPullRequestData(DbProjectBranches.PullRequestData.newBuilder()
-                    .setBranch("prBranch2")
-                    .setTitle("title3")
-                    .setUrl("url3")
-                    .build()),
-            new BranchDto()
-                .setBranchType(BranchType.PULL_REQUEST)
-                .setKey("prKey4")
-                .setUuid("uuid5")
-                .setMergeBranchUuid("uuid2")));
-
-        when(branchDao.selectByUuids(any(), any())).thenReturn(List.of(new BranchDto()
-            .setUuid("uuid2")
-            .setKey("branch2Key")));
-
-        LiveMeasureDao liveMeasureDao = mock(LiveMeasureDao.class);
-        when(dbClient.liveMeasureDao()).thenReturn(liveMeasureDao);
-        when(liveMeasureDao.selectByComponentUuidsAndMetricKeys(any(), any(), any())).thenReturn(List.of(new LiveMeasureDto()
-            .setComponentUuid("uuid1")
-            .setData("live measure")));
-
-        SnapshotDao snapshotDao = mock(SnapshotDao.class);
-        when(dbClient.snapshotDao()).thenReturn(snapshotDao);
-        when(snapshotDao.selectLastAnalysesByRootComponentUuids(any(), any())).thenReturn(List.of(new SnapshotDto().setRootComponentUuid("uuid3").setCreatedAt(1234567891234L)));
-
-        Response response = mock(Response.class);
-
-        ProjectPullRequests.ListWsResponse expected = ProjectPullRequests.ListWsResponse.newBuilder()
-            .addPullRequests(ProjectPullRequests.PullRequest.newBuilder()
-                .setKey("prKey")
-                .setTitle("title")
-                .setBranch("prBranch")
-                .setBase("branch2Key")
-                .setStatus(ProjectPullRequests.Status.newBuilder()
-                    .setQualityGateStatus("live measure")
-                    .build())
-                .setUrl("url")
-                .setTarget("target")
-                .build())
-            .addPullRequests(ProjectPullRequests.PullRequest.newBuilder()
-                .setKey("prKey2")
-                .setTitle("title2")
-                .setBranch("prBranch2")
-                .setAnalysisDate("2009-02-13T23:31:31+0000")
-                .setStatus(ProjectPullRequests.Status.newBuilder()
-                    .build())
-                .setIsOrphan(true)
-                .setUrl("url2"))
-            .addPullRequests(ProjectPullRequests.PullRequest.newBuilder()
-                .setKey("prKey3")
-                .setTitle("title3")
-                .setBranch("prBranch2")
-                .setBase("branch2Key")
-                .setStatus(ProjectPullRequests.Status.newBuilder()
-                    .build())
-                .setUrl("url3")
-                .setTarget("branch2Key")
-                .build())
-            .addPullRequests(ProjectPullRequests.PullRequest.newBuilder()
-                .setKey("prKey4")
-                .setBase("branch2Key")
-                .setStatus(ProjectPullRequests.Status.newBuilder().build())
-                .setTarget("branch2Key")
-                .build())
-            .build();
-
-
-        underTest.handle(request, response);
-
-        ArgumentCaptor<ProjectPullRequests.ListWsResponse> messageArgumentCaptor = ArgumentCaptor.forClass(ProjectPullRequests.ListWsResponse.class);
-        verify(protoBufWriter).write(messageArgumentCaptor.capture(), eq(request), eq(response));
-
-        assertThat(messageArgumentCaptor.getValue()).usingRecursiveComparison().isEqualTo(expected);
     }
 
     @Test
